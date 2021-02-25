@@ -1,21 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-
-# In[3]:
-
-
-project_name = 'Course Project - Art Image Classification'
-
-
-# In[4]:
-
-
-get_ipython().system('pip install opendatasets - -upgrade - -quiet')
-
-
-# In[240]:
-
-
+# %%
 import os
 import torch
 import shutil
@@ -36,36 +21,16 @@ from copy import copy
 from tqdm.notebook import tqdm
 get_ipython().run_line_magic('matplotlib', 'inline')
 
-
-# In[7]:
-
-
 od.download('https://www.kaggle.com/ikarus777/best-artworks-of-all-time')
 
-
-# ## Preparing the Data
-# 
-
-# In[8]:
-
+# Preparing the Data
 
 artistdata = pd.read_csv('best-artworks-of-all-time/artists.csv')
 artistdata.columns
 
-
-# In[9]:
-
-
 artistdata[artistdata['paintings'] < 50]
 
-
-# In[10]:
-
-
 artists = artistdata.drop(artistdata[artistdata['paintings'] < 50].index)
-
-
-# In[11]:
 
 
 artists = artists.sort_values(by=['name'])
@@ -75,26 +40,14 @@ print(len(artists))
 artists.head()
 
 
-# In[59]:
-
-
 weights = artists['class_weight']
 class_weights = torch.FloatTensor(weights).cuda()
-
-
-# In[205]:
 
 
 imgdir = 'best-artworks-of-all-time/images/images'
 
 
-# In[14]:
-
-
 os.rename(imgdir+'/Albrecht_Du╠êrer', imgdir+'/Albrecht_Dürer')
-
-
-# In[37]:
 
 
 shutil.rmtree(imgdir+'/Albrecht_DuΓòá├¬rer')
@@ -104,11 +57,7 @@ shutil.rmtree(imgdir+'/Georges_Seurat')
 shutil.rmtree(imgdir+'/Michelangelo')
 shutil.rmtree(imgdir+'/Jackson_Pollock')
 
-
-# #### Loading the Data and Applying Transforms
-
-# In[536]:
-
+# Loading the Data and Applying Transforms
 
 train_tfms = T.Compose([T.Resize((128, 128)),
                         T.RandomHorizontalFlip(),
@@ -118,14 +67,8 @@ val_tfms = T.Compose([T.Resize((128, 128)),
                       T.ToTensor()])
 
 
-# In[537]:
-
-
 full_dataset = ImageFolder(imgdir)
 classes = dataset.classes
-
-
-# In[625]:
 
 
 train_size = int(0.8*(len(dataset)))
@@ -136,25 +79,16 @@ train_ds, val_ds = random_split(full_dataset, [train_size, val_size])
 train_ds.dataset = copy(full_dataset)
 
 
-# In[626]:
-
-
 train_ds.dataset.transform = train_tfms
 val_ds.dataset.transform = val_tfms
-
-
-# In[627]:
 
 
 train_dl = DataLoader(train_ds, batch_size, shuffle=True,
                       num_workers=4, pin_memory=True)
 val_dl = DataLoader(val_ds, batch_size*2, num_workers=4, pin_memory=True)
 
-
-# In[628]:
-
-
 # calculating mean and stdev for all channels in train_dl
+
 pop_mean = []
 pop_std0 = []
 pop_std1 = []
@@ -177,9 +111,6 @@ pop_std0 = np.array(pop_std0).mean(axis=0)
 pop_std1 = np.array(pop_std1).mean(axis=0)
 
 
-# In[629]:
-
-
 train_tfms = T.Compose([T.Resize((128, 128)),
                         T.RandomHorizontalFlip(),
                         T.ToTensor(),
@@ -196,15 +127,8 @@ train_dl = DataLoader(train_ds, batch_size, shuffle=True,
                       num_workers=0, pin_memory=True)
 val_dl = DataLoader(val_ds, batch_size*2, num_workers=0, pin_memory=True)
 
-
-# In[630]:
-
-
 random_seed = 42
 torch.manual_seed(random_seed)
-
-
-# In[634]:
 
 
 def show_batch(dl):
@@ -216,22 +140,9 @@ def show_batch(dl):
         break
 
 
-# In[635]:
-
-
 show_batch(train_dl)
 
-
-# In[55]:
-
-
-jovian.commit(project=project_name, environment=None)
-
-
-# ### Using GPU
-
-# In[454]:
-
+# Using GPU
 
 def get_default_device():
     """Pick GPU if available, else CPU"""
@@ -265,24 +176,14 @@ class DeviceDataLoader():
         return len(self.dl)
 
 
-# In[636]:
-
-
 device = get_default_device()
 device
-
-
-# In[637]:
 
 
 train_dl = DeviceDataLoader(train_dl, device)
 valid_dl = DeviceDataLoader(val_dl, device)
 
-
-# ## Model
-
-# In[556]:
-
+# Model
 
 def accuracy(outputs, labels):
     _, preds = torch.max(outputs, dim=1)
@@ -319,9 +220,6 @@ class ImageClassificationBase(nn.Module):
             result['train_loss'], result['val_loss'], result['val_acc']))
 
 
-# In[557]:
-
-
 class ArtModel(ImageClassificationBase):
     def __init__(self, num_classes, pretrained=True):
         super().__init__()
@@ -335,11 +233,7 @@ class ArtModel(ImageClassificationBase):
     def forward(self, xb):
         return self.network(xb)
 
-
-# ## Training the Model
-
-# In[566]:
-
+# Training the Model
 
 @torch.no_grad()
 def evaluate(model, val_loader):
@@ -393,47 +287,23 @@ def fit_one_cycle(epochs, max_lr, model, train_loader, val_loader,
         history.append(result)
     return history
 
-
-# In[638]:
-
-
 model = ArtModel(len(classes))
 to_device(model, device)
 
-
-# In[639]:
-
-
 history = [evaluate(model, valid_dl)]
 history
-
-
-# In[640]:
-
 
 epochs = 5
 lr = 0.0005
 weight_decay = 0.0005
 opt_func = torch.optim.Adam
 
-
-# In[642]:
-
-
 get_ipython().run_line_magic('', 'time')
 history += fit_one_cycle(epochs, lr, model, train_dl, valid_dl,
                          weight_decay=weight_decay,
                          opt_func=opt_func)
 
-
-# In[643]:
-
-
 train_time = '15:50'
-
-
-# In[585]:
-
 
 def plot_accuracies(history):
     accuracies = [x['val_acc'] for x in history]
@@ -443,13 +313,7 @@ def plot_accuracies(history):
     plt.title('Accuracy vs. No. of epochs')
 
 
-# In[644]:
-
-
 plot_accuracies(history)
-
-
-# In[181]:
 
 
 def plot_losses(history):
@@ -463,13 +327,7 @@ def plot_losses(history):
     plt.title('Loss vs. No. of epochs')
 
 
-# In[645]:
-
-
 plot_losses(history)
-
-
-# In[589]:
 
 
 def plot_lrs(history):
@@ -480,45 +338,9 @@ def plot_lrs(history):
     plt.title('Learning Rate vs. Batch no.')
 
 
-# In[646]:
-
-
 plot_lrs(history)
 
-
-# In[647]:
-
-
 torch.save(model.state_dict(), 'ArtClassification_Resnet50_Normalized.pth')
-
-
-# In[648]:
-
-
-jovian.reset()
-jovian.log_hyperparams(arch='resnet50',
-                       epochs=epochs,
-                       lr=lr,
-                       scheduler='One Cycle',
-                       weight_decay=weight_decay,
-                       grad_clip=None,
-                       opt=opt_func.__name__)
-
-
-# In[649]:
-
-
-jovian.log_metrics(val_loss=history[-1]['val_loss'],
-                   val_acc=history[-1]['val_acc'],
-                   train_loss=history[-1]['train_loss'],
-                   time=train_time)
-
-
-# ## Testing with Individual Images
-# 
-
-# In[609]:
-
 
 def predict_image(img, model):
     # Convert to a batch of 1
@@ -530,37 +352,22 @@ def predict_image(img, model):
     # Retrieve the class label
     return full_dataset.classes[preds[0].item()]
 
-
-# In[650]:
-
-
 img, label = val_ds[30]
 plt.imshow(img.permute(1, 2, 0).clamp(0, 1))
 print('Label:', full_dataset.classes[label],
       ', Predicted:', predict_image(img, model))
-
-
-# In[651]:
-
 
 img, label = val_ds[1000]
 plt.imshow(img.permute(1, 2, 0).clamp(0, 1))
 print('Label:', full_dataset.classes[label],
       ', Predicted:', predict_image(img, model))
 
-
-# In[652]:
-
-
 img, label = val_ds[440]
 plt.imshow(img.permute(1, 2, 0).clamp(0, 1))
 print('Label:', full_dataset.classes[label],
       ', Predicted:', predict_image(img, model))
 
-
-# ### Test Set
-
-# In[653]:
+# Test Set
 
 
 test_loader = DeviceDataLoader(DataLoader(val_ds, batch_size*2), device)
@@ -569,30 +376,17 @@ result
 
 
 # ## Summary
-# 
+#
 
 # After much trial and error I was able to get it to classify with 69% accuracy.
-# 
+#
 # By using transfer learning and resnet50 i was able to get a decent result in the end.
-# 
+#
 # I tried many different learning rate schedulers and kept hitting a wall of around 48% regardless of epochs. Even after training for almost 2 hours i did not have much luck.
-# 
+#
 # What i found that helped was to reduce the weight decay parameter to .0005 and to calculate the channel means and stdevs to normalize the data. Also increasing the batch size appears to have a positive effect as well. This allowed me to reduce to a mere 5 epochs and to 16 minutes to acheieve 69%.
-# 
+#
 # Also i applied class weights to the optimizer to account for the varying amount of data for each class.
-# 
+#
 # To improve i believe I may able to include some of the tabular data provided in the csv to create a hybrid of sorts but I am not sure if that would mean that future inputs would always require similar data as provided by the csv file (for example:'country', 'genre')
-# 
-# 
-
-# In[ ]:
-
-
-jovian.commit(project=project_name, environment=None, outputs=['ArtClassification_Resnet50_Normalized.pth'])
-
-
-# In[624]:
-
-
-jovian.submit(assignment="zerotogans-project", project=project_name)
 
